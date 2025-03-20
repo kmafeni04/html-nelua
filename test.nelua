@@ -1,0 +1,77 @@
+local h = require "html"
+
+do
+  local e = h.div(
+    {
+      h.attr("class", "red")
+    },
+    {
+      h.p(
+        {},
+        {
+          h.text("Hello")
+        }
+      ),
+      h.a(
+        {
+          h.attr("href", "/about")
+        },
+        {
+          h.text("About")
+        }
+      ),
+      (function()
+        local x = 2
+        local y = 2
+        return h.text("2+2=" .. tostring(x+y))
+      end)()
+    }
+  )
+  local expected = [[
+<div class="red">
+  <p>
+    Hello
+  </p>
+  <a href="/about">
+    About
+  </a>
+  2+2=4
+</div>]]
+  local result = h.render(e)
+  assert(result == expected)
+end
+
+do
+  -- Check to see if this can be used to make components
+  local function Box(id: uinteger): h.Element
+    local e = h.div(
+      {
+        h.attr("class", "box"),
+        h.attr("id", tostring(id))
+      },
+      {
+        h.text("Box")
+      }
+    )
+    return e
+  end
+
+  local e = h.div(
+    {},
+    {
+      Box(1),
+      Box(2)
+    }
+  )
+  local expected = [[
+<div>
+  <div class="box" id="1">
+    Box
+  </div>
+  <div class="box" id="2">
+    Box
+  </div>
+</div>]]
+  local result = h.render(e)
+  assert(result == expected)
+end

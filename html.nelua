@@ -1,14 +1,18 @@
 require "span"
 require "sequence"
 require "stringbuilder"
+require "traits"
 
 local html = @record{}
 
 function html.attr(name: string, ...: varargs): string
+  assert(name ~= "", "Param `name` can not be an empty string")
   local sb: stringbuilder
   sb:write(('%s="'):format(name))
-  ## for i = 1, select('#', ...) do 
-    sb:write(("%s "):format(#[select(i, ...)]#))
+  ## for i = 1, select('#', ...) do
+    local val = #[select(i, ...)]#
+    assert(type(val) == "string", ("Param %d of attr `%s` must be of type `string`"):format(#[i]# + 1, name) )
+    sb:write(("%s "):format(val))
   ## end
   sb:rollback(1)
   sb:write('"')
@@ -16,14 +20,15 @@ function html.attr(name: string, ...: varargs): string
   return sb:promote()
 end
 
-local Element = @record{
+local html.Element = @record{
   name: string,
-  attrs: span(string),
-  children: sequence(Element),
+  attrs: sequence(string),
+  children: sequence(html.Element),
 }
 
-function html.el(name: string, attrs: span(string), children: span(Element)): Element
-  local el: Element
+function html.el(name: string, attrs: span(string), children: span(html.Element)): html.Element
+  assert(name ~= "", "Param `name` can not be an empty string")
+  local el: html.Element
   el.name = name
   el.attrs = attrs
   for _, v in ipairs(children) do
@@ -60,7 +65,7 @@ local tags = {
 ]]
 
 ## for _, v in ipairs(tags) do
-  function html.#|v|#(attrs: span(string), children: span(Element)): Element
+  function html.#|v|#(attrs: span(string), children: span(html.Element)): html.Element
     return html.el(#[v]#, attrs, children)
   end
 ## end
@@ -74,19 +79,21 @@ function html.escape(s: string): string
   return s
 end
 
-function html.text(s: string): Element
-  local el: Element
+function html.text(s: string): html.Element
+  assert(s ~= "", "Param `s` can not be an empty string")
+  local el: html.Element
   el.name = "__text__:" .. html.escape(s)
   return el
 end
 
-function html.raw(s: string): Element
-  local el: Element
+function html.raw(s: string): html.Element
+  assert(s ~= "", "Param `s` can not be an empty string")
+  local el: html.Element
   el.name = "__raw__:" .. s
   return el
 end
 
-function html.render(el: Element, indent: uinteger): string
+function html.render(el: html.Element, indent: uinteger): string
   local sb: stringbuilder
   local tab = "  "
   if not el.name:match("__.-__:.*") then
@@ -109,7 +116,6 @@ function html.render(el: Element, indent: uinteger): string
     local matched, matched_seq = el.name:match("__.-__:(.*)")
     sb:write(matched_seq[1])
   end
-
   return sb:promote()
 end
 
