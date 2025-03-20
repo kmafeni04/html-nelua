@@ -1,0 +1,116 @@
+require "span"
+require "sequence"
+require "stringbuilder"
+
+local html = @record{}
+
+function html.attr(name: string, ...: varargs): string
+  local sb: stringbuilder
+  sb:write(('%s="'):format(name))
+  ## for i = 1, select('#', ...) do 
+    sb:write(("%s "):format(#[select(i, ...)]#))
+  ## end
+  sb:rollback(1)
+  sb:write('"')
+
+  return sb:promote()
+end
+
+local Element = @record{
+  name: string,
+  attrs: span(string),
+  children: sequence(Element),
+}
+
+function html.el(name: string, attrs: span(string), children: span(Element)): Element
+  local el: Element
+  el.name = name
+  el.attrs = attrs
+  for _, v in ipairs(children) do
+    el.children:push(v)
+  end
+  return el
+end
+
+##[[
+local tags = {
+  "a",  "abbr",  "address",  "area",  "article",
+  "aside",  "audio",  "b",  "base",  "bdi",
+  "bdo",  "blockquote",  "body",  "br",  "button",
+  "canvas",  "caption",  "cite",  "code",  "col",
+  "colgroup",  "data",  "datalist",  "dd",  "del",
+  "details",  "dfn",  "dialog",  "div",  "dl",
+  "dt",  "em",  "embed",  "fieldset",  "figcaption",
+  "figure",  "footer",  "form",  "h1",  "h2",
+  "h3",  "h4",  "h5",  "h6",  "head",
+  "header",  "hr",  "html",  "i",  "iframe",
+  "img",  "input",  "ins",  "kbd",  "label",
+  "legend",  "li",  "link",  "main",  "map",
+  "mark",  "meta",  "meter",  "nav",  "noscript",
+  "object",  "ol",  "optgroup",  "option",  "output",
+  "p",  "picture",  "pre",  "progress",  "q",
+  "rp",  "rt",  "ruby",  "s",  "samp",
+  "script",  "section",  "select",  "small",  "source",
+  "span",  "strong",  "style",  "sub",  "summary",
+  "sup",  "table",  "tbody",  "td",  "template",
+  "textarea",  "tfoot",  "th",  "thead",  "time",
+  "title",  "tr",  "track",  "u",  "ul",
+  "var",  "video",  "wbr",
+}
+]]
+
+## for _, v in ipairs(tags) do
+  function html.#|v|#(attrs: span(string), children: span(Element)): Element
+    return html.el(#[v]#, attrs, children)
+  end
+## end
+
+function html.escape(s: string): string
+  s = s:gsub("&", "&amp;")
+  s = s:gsub("<", "&lt;")
+  s = s:gsub(">", "&gt;")
+  s = s:gsub("\"", "&quot;")
+  s = s:gsub("'", "&#039;")
+  return s
+end
+
+function html.text(s: string): Element
+  local el: Element
+  el.name = "__text__:" .. html.escape(s)
+  return el
+end
+
+function html.raw(s: string): Element
+  local el: Element
+  el.name = "__raw__:" .. s
+  return el
+end
+
+function html.render(el: Element, indent: uinteger): string
+  local sb: stringbuilder
+  local tab = "  "
+  if not el.name:match("__.-__:.*") then
+    sb:write(("<%s"):format(el.name))
+    for i, v in ipairs(el.attrs) do
+      sb:write((" %s"):format(v))
+    end
+    sb:write(">")
+    if #el.children > 0 then
+      sb:write("\n")
+      for _, v in ipairs(el.children) do
+        sb:write(tab:rep(indent + 1))
+        sb:write(html.render(v, indent + 1))
+        sb:write("\n")
+      end
+      sb:write(tab:rep(indent))
+    end
+    sb:write(("</%s>"):format(el.name))
+  else
+    local matched, matched_seq = el.name:match("__.-__:(.*)")
+    sb:write(matched_seq[1])
+  end
+
+  return sb:promote()
+end
+
+return html
