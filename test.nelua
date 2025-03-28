@@ -1,6 +1,7 @@
 local h = require "html"
 
 do
+  local state = "hello"
   local e = h.div(
     {
       h.attr("class", "red")
@@ -20,11 +21,12 @@ do
           h.text("About")
         }
       ),
-      (function()
+      (function(state: *void)
+        local z: *string = (@*string)(state)
         local x = 2
         local y = 2
-        return h.text("2+2=" .. tostring(x+y))
-      end)()
+        return h.text("2+2=" .. tostring(x+y) .. " " .. $z)
+      end)(&state)
     }
   )
   local expected = [[
@@ -35,7 +37,7 @@ do
   <a href="/about">
     About
   </a>
-  2+2=4
+  2+2=4 hello
 </div>]]
   local result = h.render(e)
   assert(result == expected)
