@@ -7,6 +7,9 @@ do
       h.attr("class", "red")
     },
     {
+      h.input(
+        {h.attr("type", "password")}
+      ),
       h.p(
         {},
         {
@@ -31,6 +34,7 @@ do
   )
   local expected = [[
 <div class="red">
+  <input type="password" />
   <p>
     Hello
   </p>

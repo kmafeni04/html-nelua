@@ -64,6 +64,21 @@ local tags = {
 }
 ]]
 
+local self_closing: hashmap(string, boolean)
+self_closing["area"] = true
+self_closing["br"] = true
+self_closing["col"] = true
+self_closing["embed"] = true
+self_closing["hr"] = true
+self_closing["img"] = true
+self_closing["input"] = true
+self_closing["link"] = true
+self_closing["meta"] = true
+self_closing["param"] = true
+self_closing["source"] = true
+self_closing["track"] = true
+self_closing["wbr"] = true
+
 ## for _, v in ipairs(tags) do
   function html.#|v|#(attrs: span(string), children: span(html.Element)): html.Element
     return html.el(#[v]#, attrs, children)
@@ -96,7 +111,13 @@ end
 function html.render(el: html.Element, indent: uinteger): string
   local sb: stringbuilder
   local tab = "  "
-  if not el.name:match("__.-__:.*") then
+  if self_closing:has(el.name) then
+    sb:write(("<%s"):format(el.name))
+    for i, v in ipairs(el.attrs) do
+      sb:write((" %s"):format(v))
+    end
+    sb:write(" />")
+  elseif not el.name:match("__.-__:.*") then
     sb:write(("<%s"):format(el.name))
     for i, v in ipairs(el.attrs) do
       sb:write((" %s"):format(v))
