@@ -85,12 +85,15 @@ self_closing["wbr"] = true
   end
 ## end
 
+local chars_to_escape: hashmap(string, string) 
+chars_to_escape["&"] = "&amp;"
+chars_to_escape["<"] = "&lt;"
+chars_to_escape[">"] = "&gt;"
+chars_to_escape['"'] = "&quot;"
+chars_to_escape["'"] = "&#039;"
+
 function html.escape(s: string): string
-  s = s:gsub("&", "&amp;")
-  s = s:gsub("<", "&lt;")
-  s = s:gsub(">", "&gt;")
-  s = s:gsub("\"", "&quot;")
-  s = s:gsub("'", "&#039;")
+  s = s:gsub([=[[&<>"']]=], chars_to_escape)
   return s
 end
 
