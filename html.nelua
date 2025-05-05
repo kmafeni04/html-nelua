@@ -1,41 +1,32 @@
-require "span"
-require "sequence"
-require "stringbuilder"
-require "traits"
+require "string"
 
 local html = @record{}
 
-function html.attr(name: string, ...: varargs): string
-  assert(name ~= "", "Param `name` can not be an empty string")
-  local sb: stringbuilder
-  sb:write(('%s="'):format(name))
-  ## for i = 1, select('#', ...) do
-    local val = #[select(i, ...)]#
-    assert(type(val) == "string", ("Param %d of attr `%s` must be of type `string`"):format(#[i]# + 1, name) )
-    sb:write(("%s "):format(val))
-  ## end
-  sb:rollback(1)
-  sb:write('"')
+local chars_to_escape: hashmap(string, string) 
+chars_to_escape["&"] = "&amp;"
+chars_to_escape["<"] = "&lt;"
+chars_to_escape[">"] = "&gt;"
+chars_to_escape['"'] = "&quot;"
+chars_to_escape["'"] = "&#039;"
 
-  return sb:promote()
+function html.escape(s: string): string
+  s = s:gsub([=[[&<>"']]=], chars_to_escape)
+  return s
 end
 
-local html.Element = @record{
+function html.raw(s: string): string
+  assert(s ~= "", "Param `s` can not be an empty string")
+  return "__raw__:" .. s
+end
+
+local html.Attr = @record{
   name: string,
-  attrs: sequence(string),
-  children: sequence(html.Element),
+  value: string
 }
 
-function html.el(name: string, attrs: span(string), children: span(html.Element)): html.Element
-  assert(name ~= "", "Param `name` can not be an empty string")
-  local el: html.Element
-  el.name = name
-  el.attrs = attrs
-  for _, v in ipairs(children) do
-    el.children:push(v)
-  end
-  return el
-end
+local Ctx = @record{
+  buf: stringbuilder,
+}
 
 ##[[
 local tags = {
@@ -79,68 +70,60 @@ self_closing["source"] = true
 self_closing["track"] = true
 self_closing["wbr"] = true
 
+function Ctx:el(name: string, data: pointer, attrs: sequence(html.Attr), body: overload(string, function(pointer), niltype)): void
+  assert(name ~= "")
+  self.buf:writef("<%s", name)
+  if #attrs > 0 then
+    for _, v in ipairs(attrs) do
+      assert(v.name ~= "")
+      if v.value == "" then
+        self.buf:writef(' %s', v.name)
+      else
+        self.buf:writef(' %s="%s"', v.name, v.value)
+      end
+    end
+  end
+  if self_closing:has(name) then
+    self.buf:write(" />")
+  else
+    self.buf:write(">")
+    ## if body.type.is_string then
+      if body:match("^__raw__:.*$") then
+        self.buf:write(body:sub(#("__raw__:") + 1))
+      else
+        self.buf:write(html.escape(body))
+      end
+    ## elseif body.type.is_function then
+      body(data)
+    ## end
+    self.buf:writef("</%s>", name)
+  end
+end
+
 ## for _, v in ipairs(tags) do
-  function html.#|v|#(attrs: span(string), children: span(html.Element)): html.Element
-    return html.el(#[v]#, attrs, children)
+  function Ctx:#|v|#(data: pointer, attrs: sequence(html.Attr), body: overload(string, function(pointer), niltype)): void
+    self:el(#[v]#, data, attrs, body)
   end
 ## end
 
-local chars_to_escape: hashmap(string, string) 
-chars_to_escape["&"] = "&amp;"
-chars_to_escape["<"] = "&lt;"
-chars_to_escape[">"] = "&gt;"
-chars_to_escape['"'] = "&quot;"
-chars_to_escape["'"] = "&#039;"
-
-function html.escape(s: string): string
-  s = s:gsub([=[[&<>"']]=], chars_to_escape)
-  return s
-end
-
-function html.text(s: string): html.Element
+function Ctx:text(s: string): void
   assert(s ~= "", "Param `s` can not be an empty string")
-  local el: html.Element
-  el.name = "__text__:" .. html.escape(s)
-  return el
+  self.buf:write(html.escape(s))
 end
 
-function html.raw(s: string): html.Element
+function Ctx:raw(s: string): void
   assert(s ~= "", "Param `s` can not be an empty string")
-  local el: html.Element
-  el.name = "__raw__:" .. s
-  return el
+  self.buf:write(html.raw(s))
 end
 
-function html.render(el: html.Element, indent: uinteger): string
-  local sb: stringbuilder
-  local tab = "  "
-  if self_closing:has(el.name) then
-    sb:write(("<%s"):format(el.name))
-    for i, v in ipairs(el.attrs) do
-      sb:write((" %s"):format(v))
-    end
-    sb:write(" />")
-  elseif not el.name:match("__.-__:.*") then
-    sb:write(("<%s"):format(el.name))
-    for i, v in ipairs(el.attrs) do
-      sb:write((" %s"):format(v))
-    end
-    sb:write(">")
-    if #el.children > 0 then
-      sb:write("\n")
-      for _, v in ipairs(el.children) do
-        sb:write(tab:rep(indent + 1))
-        sb:write(html.render(v, indent + 1))
-        sb:write("\n")
-      end
-      sb:write(tab:rep(indent))
-    end
-    sb:write(("</%s>"):format(el.name))
-  else
-    local matched, matched_seq = el.name:match("__.-__:(.*)")
-    sb:write(matched_seq[1])
-  end
-  return sb:promote()
+function Ctx:render(): string
+  return self.buf:promote()
 end
+
+function Ctx:destroy()
+  self.buf:destroy()
+end
+
+local html.Ctx = Ctx
 
 return html
