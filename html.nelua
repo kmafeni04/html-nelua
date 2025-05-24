@@ -113,7 +113,7 @@ end
 
 function Ctx:raw(s: string): void
   assert(s ~= "", "Param `s` can not be an empty string")
-  self.buf:write(html.raw(s))
+  self.buf:write(s)
 end
 
 function Ctx:render(): string
