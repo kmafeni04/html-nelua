@@ -1,0 +1,70 @@
+local ssdg = require "ssdg"
+
+local gen = ssdg.new{
+  lang = "lua",
+  lead = "-",
+  single_line = "--",
+  multi_line = {
+    starting = "--[[",
+    ending = "]]"
+  }
+}
+
+local subs: hashmap(string, string)
+subs["lang"] = gen.conf.lang
+
+gen:add([=[# html.nelua
+
+A html DSL written for nelua
+
+## How to install
+
+Copy the `html.nelua` file into your project and require it
+
+```:lang:
+local html = require("path.to.html")
+```
+
+## Quick start
+
+```:lang:
+local html = require("path.to.html")
+
+local ctx: html.Ctx
+
+local attrs: hashmap(string, string)
+attrs["class"] = "red"
+ctx:div(attrs, function(self: *html.Ctx, data: pointer)
+  for i = 1, 2 do
+    self:h1(nil, "hello" .. i)
+  end
+end)
+print(ctx:tostring())
+-- <div class="red"><h1>hello1</h1><h1>hello2</h1></div>
+```
+
+## Reference
+
+]=], {subs = subs})
+
+gen:add_file("html.nelua", { subs = subs })
+
+gen:add([[
+## Development
+
+### Running Tests
+From the project root:
+```console
+$ nelua test.nelua
+```
+
+### Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new features
+4. Submit a pull request
+
+For questions or issues, please use the GitHub issue tracker.
+]], { subs = subs })
+
+gen:write_file("README.md")

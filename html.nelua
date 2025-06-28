@@ -1,6 +1,11 @@
 require "string"
 
+require "libs.inline_map"
+
+--- ### html module
+---`
 local html = @record{}
+---`
 
 local chars_to_escape: hashmap(string, string) 
 chars_to_escape["&"] = "&amp;"
@@ -9,26 +14,35 @@ chars_to_escape[">"] = "&gt;"
 chars_to_escape['"'] = "&quot;"
 chars_to_escape["'"] = "&#039;"
 
+--- ### html.escape
+--- Used to escape a string that will be appended to the [Ctx](#htmlctx) buffer
+---`
 function html.escape(s: string): string
+---`
   s = s:gsub([=[[&<>"']]=], chars_to_escape)
   return s
 end
 
+--- ### html.raw
+--- Used to format a string so that when appended to the [Ctx](#htmlctx) buffer, it will not be escaped
+---`
 function html.raw(s: string): string
+---`
   assert(s ~= "", "Param `s` can not be an empty string")
   return "__raw__:" .. s
 end
 
-local html.Attr = @record{
-  name: string,
-  value: string
-}
-
-local Ctx = @record{
+--- ### html.Ctx
+--- This record provides the functions for generating the html
+---`
+local html.Ctx = @record{
   buf: stringbuilder,
 }
+---`
 
 ##[[
+--- ### Supported tags
+---`
 local tags = {
   "a",  "abbr",  "address",  "area",  "article",
   "aside",  "audio",  "b",  "base",  "bdi",
@@ -53,36 +67,54 @@ local tags = {
   "title",  "tr",  "track",  "u",  "ul",
   "var",  "video",  "wbr",
 }
+---`
 ]]
 
-local self_closing: hashmap(string, boolean)
-self_closing["area"] = true
-self_closing["br"] = true
-self_closing["col"] = true
-self_closing["embed"] = true
-self_closing["hr"] = true
-self_closing["img"] = true
-self_closing["input"] = true
-self_closing["link"] = true
-self_closing["meta"] = true
-self_closing["param"] = true
-self_closing["source"] = true
-self_closing["track"] = true
-self_closing["wbr"] = true
+--- If a tag is marked as self closing, the `body` will be ignored
+---`
+local self_closing = inline_map!(string, boolean, {
+  area = true,
+  br = true,
+  col = true,
+  embed = true,
+  hr = true,
+  img = true,
+  input = true,
+  link = true,
+  meta = true,
+  param = true,
+  source = true,
+  track = true,
+  wbr = true,
+})
+---`
 
-function Ctx:el(name: string, data: pointer, attrs: sequence(html.Attr), body: overload(string, function(pointer), niltype)): void
-  assert(name ~= "")
+--- ### html.Ctx:el
+--[[-
+Function to append a html tag to the [Ctx](#htmlctx) buffer
+- `name`: The name of the element tag
+- `attrs`: A hashmap that will be formatted as tag attributes
+- `body`: Either a function or string, if it is a string, it is escaped and added to the buffer else it is ran
+- `data`: This is passed as the `data` argument to `body` when it is a function
+-]]
+---`
+function html.Ctx:el(
+  name: string,
+  attrs: facultative(hashmap(string, string)),
+  body: overload(string, function(self: *html.Ctx, data: pointer), niltype),
+  data: pointer
+): *html.Ctx
+---`
   self.buf:writef("<%s", name)
-  if #attrs > 0 then
-    for _, v in ipairs(attrs) do
-      assert(v.name ~= "")
-      if v.value == "" then
-        self.buf:writef(' %s', v.name)
+  ## if attrs.type.is_hashmap then
+    for k, v in pairs(attrs) do
+      if v == "" then
+        self.buf:writef(' %s', k)
       else
-        self.buf:writef(' %s="%s"', v.name, v.value)
+        self.buf:writef(' %s="%s"', k, v)
       end
     end
-  end
+  ## end
   if self_closing:has(name) then
     self.buf:write(" />")
   else
@@ -94,36 +126,60 @@ function Ctx:el(name: string, data: pointer, attrs: sequence(html.Attr), body: o
         self.buf:write(html.escape(body))
       end
     ## elseif body.type.is_function then
-      body(data)
+      body(self, data)
     ## end
     self.buf:writef("</%s>", name)
   end
+  return self
 end
 
-## for _, v in ipairs(tags) do
-  function Ctx:#|v|#(data: pointer, attrs: sequence(html.Attr), body: overload(string, function(pointer), niltype)): void
-    self:el(#[v]#, data, attrs, body)
-  end
+--- ### html.Ctx:#|tag|#
+--[[-
+Functions for different html elements based on the supported [tags](#supported-tags)
+Built off of [Ctx:el](#htmlctxel)
+-]]
+## for _, tag in ipairs(tags) do
+---`
+function html.Ctx:#|tag|#(
+  attrs: facultative(hashmap(string, string)),
+  body: overload(string, function(self: *html.Ctx, data: pointer), niltype),
+  data: pointer
+): *html.Ctx
+---`
+  return self:el(#[tag]#, attrs, body, data)
+end
 ## end
 
-function Ctx:text(s: string): void
-  assert(s ~= "", "Param `s` can not be an empty string")
+--- ### html.Ctx:text
+--- Escapes `s` and appends it to the [Ctx](#htmlctx) buffer
+---`
+function html.Ctx:text(s: string): void
+---`
   self.buf:write(html.escape(s))
 end
 
-function Ctx:raw(s: string): void
-  assert(s ~= "", "Param `s` can not be an empty string")
+--- ### html.Ctx:raw
+--- Appends `s` as is to the [Ctx](#htmlctx) buffer
+---`
+function html.Ctx:raw(s: string): void
+---`
   self.buf:write(s)
 end
 
-function Ctx:render(): string
+--- ### html.Ctx:tostring
+--- Returns the content of the [Ctx](#htmlctx) buffer and clears it
+---`
+function html.Ctx:tostring(): string
+---`
   return self.buf:promote()
 end
 
-function Ctx:destroy()
+--- ### html.Ctx:tostring
+--- Destroys the [Ctx](#htmlctx) buffer
+---`
+function html.Ctx:destroy()
+---`
   self.buf:destroy()
 end
-
-local html.Ctx = Ctx
 
 return html
