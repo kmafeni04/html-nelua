@@ -13,7 +13,12 @@ return {
     {
       name = "ssdg",
       repo = "https://github.com/kmafeni04/ssdg",
-      version = "#a41a8ff83b1baea1b3ef53bf27ce1c8966f62ec4",
+      version = "#9e1fb58f183ae7efea98d25a40d6d1bf38f483af",
+    },
+    {
+      name = "map-nelua",
+      repo = "https://github.com/kmafeni04/map-nelua",
+      version = "#74f7d0ebbf5057ba202f2659d25c75b225b17d7d",
     },
   },
   scripts = {

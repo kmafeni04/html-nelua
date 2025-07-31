@@ -4,7 +4,14 @@ A html DSL written for nelua
 
 ## How to install
 
-Copy the `html.nelua` file into your project and require it
+Add to your [nlpm](https://github.com/kmafeni04/nlpm) package dependencies
+```lua
+{
+  name = "html-nelua",
+  repo = "https://github.com/kmafeni04/html-nelua",
+  version = "COMMIT-HASH-OR-TAG",
+},
+```
 
 ```lua
 local html = require("path.to.html")
@@ -15,16 +22,16 @@ local html = require("path.to.html")
 ```lua
 local html = require("path.to.html")
 
-local ctx: html.Ctx
-
 local attrs: hashmap(string, string)
 attrs["class"] = "red"
-ctx:div(attrs, function(self: *html.Ctx, data: pointer)
+local el = html.div(attrs, (do
+  local els: sequence(html.Element)
   for i = 1, 2 do
-    self:h1(nil, "hello" .. i)
+    els:push(html.h1(nil, "hello" .. i))
   end
-end)
-print(ctx:tostring())
+  in els
+end))
+print(el:tostring())
 -- <div class="red"><h1>hello1</h1><h1>hello2</h1></div>
 ```
 
@@ -36,30 +43,28 @@ print(ctx:tostring())
 local html = @record{}
 ```
 
-### html.escape
-
-Used to escape a string that will be appended to the [Ctx](#htmlctx) buffer
+### html.Element
 
 ```lua
-function html.escape(s: string): string
-```
-
-### html.raw
-
-Used to format a string so that when appended to the [Ctx](#htmlctx) buffer, it will not be escaped
-
-```lua
-function html.raw(s: string): string
-```
-
-### html.Ctx
-
-This record provides the functions for generating the html
-
-```lua
-local html.Ctx = @record{
-  buf: stringbuilder,
+local html.Element = @record{
+  buf: stringbuilder
 }
+```
+
+### html.Element:tostring
+
+Returns the content of the [Element's](#htmlelement) buffer and clears it
+
+```lua
+function html.Element:tostring(): string
+```
+
+### html.Element:destroy
+
+Destroys the [Element's](#htmlelement) buffer
+
+```lua
+function html.Element:destroy()
 ```
 
 ### Supported tags
@@ -94,7 +99,7 @@ local tags = {
 If a tag is marked as self closing, the `body` will be ignored
 
 ```lua
-local self_closing = inline_map!(string, boolean, {
+local self_closing = map!(string, boolean, {
   area = true,
   br = true,
   col = true,
@@ -111,66 +116,55 @@ local self_closing = inline_map!(string, boolean, {
 })
 ```
 
-### html.Ctx:el
+### html.escape
 
-Function to append a html tag to the [Ctx](#htmlctx) buffer
+Used to escape a string that will be appended to an [Element's](#htmlelement) buffer
+
+```lua
+function html.escape(s: string): string
+```
+
+### html.el
+
+Function to create a new html [Element](#htmlelement)
 - `name`: The name of the element tag
 - `attrs`: A hashmap that will be formatted as tag attributes
 - `body`: Either a function or string, if it is a string, it is escaped and added to the buffer else it is ran
-- `data`: This is passed as the `data` argument to `body` when it is a function
 
 ```lua
-function html.Ctx:el(
+function html.el(
   name: string,
   attrs: facultative(hashmap(string, string)),
-  body: overload(string, function(self: *html.Ctx, data: pointer), niltype),
-  data: pointer
-): *html.Ctx
+  body: overload(string, html.Element, sequence(html.Element), niltype)
+): html.Element
 ```
 
-### html.Ctx:#|tag|#
+### html.#|tag|#
 
 Functions for different html elements based on the supported [tags](#supported-tags)
-Built off of [Ctx:el](#htmlctxel)
+Built off of [html.el](#htmlel)
 
 ```lua
-function html.Ctx:#|tag|#(
+function html.#|tag|#(
   attrs: facultative(hashmap(string, string)),
-  body: overload(string, function(self: *html.Ctx, data: pointer), niltype),
-  data: pointer
-): *html.Ctx
+  body: overload(string, html.Element, sequence(html.Element), niltype)
+): html.Element
 ```
 
-### html.Ctx:text
+### html.text
 
-Escapes `s` and appends it to the [Ctx](#htmlctx) buffer
+Escapes `s` and creates a new [Element](#htmlelement) from it
 
 ```lua
-function html.Ctx:text(s: string): void
+function html.text(s: string): html.Element
 ```
 
-### html.Ctx:raw
+### html.raw
 
-Appends `s` as is to the [Ctx](#htmlctx) buffer
-
-```lua
-function html.Ctx:raw(s: string): void
-```
-
-### html.Ctx:tostring
-
-Returns the content of the [Ctx](#htmlctx) buffer and clears it
+Creates a new [Element](#htmlelement) from `s` as is
 
 ```lua
-function html.Ctx:tostring(): string
-```
-
-### html.Ctx:tostring
-
-Destroys the [Ctx](#htmlctx) buffer
-
-```lua
-function html.Ctx:destroy()
+function html.raw(s: string): html.Element
 ```
 
 ## Development

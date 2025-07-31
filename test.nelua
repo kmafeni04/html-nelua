@@ -1,76 +1,54 @@
-require "libs.inline_map"
-
 local html = require ".html"
 
 do
-  local ctx: html.Ctx
-  local result = ctx:h1(nil, "hello"):tostring()
+  local result = html.h1(nil, "hello"):tostring()
   local expected = "<h1>hello</h1>"
   assert(expected == result)
-  ctx:destroy()
 end
 
 do
-  local ctx: html.Ctx
-  local result = ctx:div(nil, function(self: *html.Ctx, data: pointer)
-    self:text("<hello>")
-    self:h1(nil, "<hello>")
-    self:h2(nil, html.raw("<hello>"))
-    self:raw("<h3><hello></h3>")
-  end):tostring()
+  local result = html.div(nil, (do
+    local els: sequence(html.Element)
+    els:push(html.text("<hello>"))
+    els:push(html.h1(nil, "<hello>"))
+    els:push(html.h2(nil, html.raw("<hello>")))
+    els:push(html.raw("<h3><hello></h3>"))
+    in els
+  end)):tostring()
   local expected = "<div>&lt;hello&gt;<h1>&lt;hello&gt;</h1><h2><hello></h2><h3><hello></h3></div>"
   assert(expected == result)
-  ctx:destroy()
 end
 
 do
-  local ctx: html.Ctx
-  local result = ctx:form(inline_map!(string, string, {
+  local result = html.div(nil, (do
+    local els: sequence(html.Element)
+    for i = 1, 5 do
+      els:push(html.h1(nil, tostring(i)))
+    end
+    els:push(html.text("<hello>"))
+    els:push(html.raw("<hello>"))
+    in els
+  end)):tostring()
+  local expected = "<div><h1>1</h1><h1>2</h1><h1>3</h1><h1>4</h1><h1>5</h1>&lt;hello&gt;<hello></div>"
+  assert(expected == result)
+end
+
+do
+  local result = html.form(map!(string, string, {
     action = "/submit",
     method = "POST"
-  }), function(self: *html.Ctx, data: pointer)
-    self:input(inline_map!(string, string, {
+  }), (do
+    local els: sequence(html.Element)
+    els:push(html.input(map!(string, string, {
       name = "name",
       id = "name",
       required = ""
-    }))
-    self:button(nil, "Submit")
-  end):tostring()
+    })))
+    els:push(html.button(nil, "Submit"))
+    in els
+  end)):tostring()
   local expected = [[<form action="/submit" method="POST"><input name="name" id="name" required /><button>Submit</button></form>]]
   assert(expected == result)
-  ctx:destroy()
-end
-
-do
-  local ctx: html.Ctx
-  local result = ctx:h1():h2():h3():h4():tostring()
-  local expected = "<h1></h1><h2></h2><h3></h3><h4></h4>"
-  assert(expected == result)
-  ctx:destroy()
-end
-
-do
-  local ctx: html.Ctx
-  local result = ctx:h1():h2():h3():h4():tostring()
-  local expected = "<h1></h1><h2></h2><h3></h3><h4></h4>"
-  assert(expected == result)
-  ctx:destroy()
-end
-
-do
-  local ctx: html.Ctx
-  local data = "hello"
-  local result = ctx:div(nil, function(self: *html.Ctx, data: pointer)
-    local str = $(@*string)(data)
-    self:h1(nil, str)
-    self:div(nil, function(self: *html.Ctx, data: pointer)
-      local str = $(@*string)(data)
-      self:h2(nil, str .. " world")
-    end, data)
-  end, &data):tostring()
-  local expected = [[<div><h1>hello</h1><div><h2>hello world</h2></div></div>]]
-  assert(expected == result)
-  ctx:destroy()
 end
 
 print("All tests pass")

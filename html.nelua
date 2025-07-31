@@ -1,44 +1,41 @@
 require "string"
 
-require "libs.inline_map"
+require "map-nelua.map"
 
 --- ### html module
 ---`
 local html = @record{}
 ---`
 
-local chars_to_escape: hashmap(string, string) 
+local chars_to_escape: hashmap(string, string)
 chars_to_escape["&"] = "&amp;"
 chars_to_escape["<"] = "&lt;"
 chars_to_escape[">"] = "&gt;"
 chars_to_escape['"'] = "&quot;"
 chars_to_escape["'"] = "&#039;"
 
---- ### html.escape
---- Used to escape a string that will be appended to the [Ctx](#htmlctx) buffer
+--- ### html.Element
 ---`
-function html.escape(s: string): string
----`
-  s = s:gsub([=[[&<>"']]=], chars_to_escape)
-  return s
-end
-
---- ### html.raw
---- Used to format a string so that when appended to the [Ctx](#htmlctx) buffer, it will not be escaped
----`
-function html.raw(s: string): string
----`
-  assert(s ~= "", "Param `s` can not be an empty string")
-  return "__raw__:" .. s
-end
-
---- ### html.Ctx
---- This record provides the functions for generating the html
----`
-local html.Ctx = @record{
-  buf: stringbuilder,
+local html.Element = @record{
+  buf: stringbuilder
 }
 ---`
+
+--- ### html.Element:tostring
+--- Returns the content of the [Element's](#htmlelement) buffer and clears it
+---`
+function html.Element:tostring(): string
+---`
+  return self.buf:promote()
+end
+
+--- ### html.Element:destroy
+--- Destroys the [Element's](#htmlelement) buffer
+---`
+function html.Element:destroy()
+---`
+  self.buf:destroy()
+end
 
 ##[[
 --- ### Supported tags
@@ -72,7 +69,7 @@ local tags = {
 
 --- If a tag is marked as self closing, the `body` will be ignored
 ---`
-local self_closing = inline_map!(string, boolean, {
+local self_closing = map!(string, boolean, {
   area = true,
   br = true,
   col = true,
@@ -89,97 +86,94 @@ local self_closing = inline_map!(string, boolean, {
 })
 ---`
 
---- ### html.Ctx:el
+--- ### html.escape
+--- Used to escape a string that will be appended to an [Element's](#htmlelement) buffer
+---`
+function html.escape(s: string): string
+---`
+  s = s:gsub([=[[&<>"']]=], chars_to_escape)
+  return s
+end
+
+--- ### html.el
 --[[-
-Function to append a html tag to the [Ctx](#htmlctx) buffer
+Function to create a new html [Element](#htmlelement)
 - `name`: The name of the element tag
 - `attrs`: A hashmap that will be formatted as tag attributes
 - `body`: Either a function or string, if it is a string, it is escaped and added to the buffer else it is ran
-- `data`: This is passed as the `data` argument to `body` when it is a function
 -]]
 ---`
-function html.Ctx:el(
+function html.el(
   name: string,
   attrs: facultative(hashmap(string, string)),
-  body: overload(string, function(self: *html.Ctx, data: pointer), niltype),
-  data: pointer
-): *html.Ctx
+  body: overload(string, html.Element, sequence(html.Element), niltype)
+): html.Element
 ---`
-  self.buf:writef("<%s", name)
+  local el: html.Element
+
+  el.buf:writef("<%s", name)
   ## if attrs.type.is_hashmap then
     for k, v in pairs(attrs) do
       if v == "" then
-        self.buf:writef(' %s', k)
+        el.buf:writef(' %s', k)
       else
-        self.buf:writef(' %s="%s"', k, v)
+        el.buf:writef(' %s="%s"', k, v)
       end
     end
   ## end
   if self_closing:has(name) then
-    self.buf:write(" />")
+    el.buf:write(" />")
   else
-    self.buf:write(">")
+    el.buf:write(">")
     ## if body.type.is_string then
-      if body:match("^__raw__:.*$") then
-        self.buf:write(body:sub(#("__raw__:") + 1))
-      else
-        self.buf:write(html.escape(body))
+      el.buf:write(html.escape(body))
+    ## elseif body.type.is_sequence then
+      for _, sub_el in ipairs(body) do
+        el.buf:write(sub_el.buf:promote())
       end
-    ## elseif body.type.is_function then
-      body(self, data)
+    ## elseif body.type.is_record then
+      el.buf:write(body.buf:promote())
     ## end
-    self.buf:writef("</%s>", name)
+    el.buf:writef("</%s>", name)
   end
-  return self
+
+  return el
 end
 
---- ### html.Ctx:#|tag|#
+--- ### html.#|tag|#
 --[[-
 Functions for different html elements based on the supported [tags](#supported-tags)
-Built off of [Ctx:el](#htmlctxel)
+Built off of [html.el](#htmlel)
 -]]
 ## for _, tag in ipairs(tags) do
 ---`
-function html.Ctx:#|tag|#(
+function html.#|tag|#(
   attrs: facultative(hashmap(string, string)),
-  body: overload(string, function(self: *html.Ctx, data: pointer), niltype),
-  data: pointer
-): *html.Ctx
+  body: overload(string, html.Element, sequence(html.Element), niltype)
+): html.Element
 ---`
-  return self:el(#[tag]#, attrs, body, data)
+  return html.el(#[tag]#, attrs, body)
 end
 ## end
 
---- ### html.Ctx:text
---- Escapes `s` and appends it to the [Ctx](#htmlctx) buffer
+--- ### html.text
+--- Escapes `s` and creates a new [Element](#htmlelement) from it
 ---`
-function html.Ctx:text(s: string): void
+function html.text(s: string): html.Element
 ---`
-  self.buf:write(html.escape(s))
+  local el: html.Element
+  el.buf:write(html.escape(s))
+  return el
 end
 
---- ### html.Ctx:raw
---- Appends `s` as is to the [Ctx](#htmlctx) buffer
+--- ### html.raw
+--- Creates a new [Element](#htmlelement) from `s` as is
 ---`
-function html.Ctx:raw(s: string): void
+function html.raw(s: string): html.Element
 ---`
-  self.buf:write(s)
-end
-
---- ### html.Ctx:tostring
---- Returns the content of the [Ctx](#htmlctx) buffer and clears it
----`
-function html.Ctx:tostring(): string
----`
-  return self.buf:promote()
-end
-
---- ### html.Ctx:tostring
---- Destroys the [Ctx](#htmlctx) buffer
----`
-function html.Ctx:destroy()
----`
-  self.buf:destroy()
+  local el: html.Element
+  el.buf:write(s)
+  return el
 end
 
 return html

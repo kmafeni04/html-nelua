@@ -19,7 +19,14 @@ A html DSL written for nelua
 
 ## How to install
 
-Copy the `html.nelua` file into your project and require it
+Add to your [nlpm](https://github.com/kmafeni04/nlpm) package dependencies
+```lua
+{
+  name = "html-nelua",
+  repo = "https://github.com/kmafeni04/html-nelua",
+  version = "COMMIT-HASH-OR-TAG",
+},
+```
 
 ```:lang:
 local html = require("path.to.html")
@@ -30,16 +37,16 @@ local html = require("path.to.html")
 ```:lang:
 local html = require("path.to.html")
 
-local ctx: html.Ctx
-
 local attrs: hashmap(string, string)
 attrs["class"] = "red"
-ctx:div(attrs, function(self: *html.Ctx, data: pointer)
+local el = html.div(attrs, (do
+  local els: sequence(html.Element)
   for i = 1, 2 do
-    self:h1(nil, "hello" .. i)
+    els:push(html.h1(nil, "hello" .. i))
   end
-end)
-print(ctx:tostring())
+  in els
+end))
+print(el:tostring())
 -- <div class="red"><h1>hello1</h1><h1>hello2</h1></div>
 ```
 
